@@ -68,6 +68,7 @@ func SetNewLine(n string) {
 
 type Errs interface {
 	Append(err error)
+	Flatten() Errs
 	Error() string
 	ErrorOrNil() error
 	Is(target error) bool
@@ -121,6 +122,28 @@ func (e *errs) Append(err error) {
 		e.Errors = make([]error, 0)
 	}
 	e.Errors = append(e.Errors, err)
+}
+
+func (e *errs) Flatten() Errs {
+	if e == nil {
+		return nil
+	}
+
+	e.mx.Lock()
+	defer e.mx.Unlock()
+
+	result := new(errs)
+	for _, err := range e.Errors {
+		if err == nil {
+			continue
+		}
+		if err, ok := err.(*errs); ok {
+			result.Errors = append(result.Errors, err.Errors...)
+		} else {
+			result.Errors = append(result.Errors, err)
+		}
+	}
+	return result
 }
 
 func (e *errs) Is(target error) bool {
